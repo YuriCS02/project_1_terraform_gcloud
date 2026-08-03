@@ -104,7 +104,7 @@ terraform destroy
 
 🙏 Créditos e Agradecimentos
 
-Este projeto foi desenvolvido por com fins de estudo e prática de IaC (Infrastructure as Code) e Google Cloud Platform.
+Este projeto foi desenvolvido por Yuri Calil,com fins de estudo e prática de IaC (Infrastructure as Code) e Google Cloud Platform.
 
 O projeto foi baseado e inspirado no tutorial em vídeo do canal de Rishab Kumar (link: https://www.youtube.com/@rishabincloud) , que cria conteúdos sobre DevOps, Terraform e Cloud Engineering.
 
