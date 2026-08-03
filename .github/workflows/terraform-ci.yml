@@ -42,11 +42,11 @@ jobs:
       - name: Terraform Init
         run: terraform init
 
-      # 5. Executa o terraform plan
+      # 5. Executa o terraform plan usando o Secret do GCP Project
       - name: Terraform Plan
         id: plan
-        run: terraform plan -no-color -out=tfplan
-        continue-on-error: true
+        run: terraform plan -input=false -var="gcp_project=${{ secrets.GCP_PROJECT_ID }}" -no-color -out=tfplan
+        continue-on-error: truee
 
       # 6. Comenta o resultado do Plan automaticamente dentro do Pull Request
       - name: Comment Plan on PR
