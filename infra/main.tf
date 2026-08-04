@@ -2,14 +2,17 @@
 resource "google_storage_bucket" "website" {
   name = "example-website-by-yuri"
   location = "US"
+  website {
+    main_page_suffix = "index.html"
+    not_found_page   = "index.html"
+  }
 }
 #Make the bucket public
 
-resource "google_storage_object_access_control" "public_rule" {
-    object = google_storage_bucket_object.static_site_src.name
-    bucket = google_storage_bucket.website.name
-    role   = "READER"
-    entity = "allUsers"
+resource "google_storage_bucket_iam_member" "public_rule" {
+  bucket = google_storage_bucket.website.name
+  role   = "roles/storage.objectViewer"
+  member = "allUsers"
 }
 
 #Upload index.html to the bucket
