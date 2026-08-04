@@ -1,7 +1,10 @@
-name: "Terraform CI"
+name: "Terraform CI & Website Deploy"
 
 on:
   pull_request:
+    branches:
+      - main
+  push:
     branches:
       - main
 
@@ -11,44 +14,41 @@ permissions:
   pull-requests: write
 
 jobs:
+  # JOB 1: Valida o Terraform durante Pull Requests
   terraform-plan:
     name: "Terraform Plan"
     runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
 
-    # Aponta para a pasta onde estão os arquivos .tf
     defaults:
       run:
         working-directory: ./infra
 
     steps:
-      # 1. Baixa o código do repositório
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 2. Autentica na GCP via Workload Identity (Sem chaves JSON!)
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
-      # 3. Instala o Terraform na máquina do GitHub Actions
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.5.0
 
-      # 4. Inicializa o Terraform
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -input=false
 
-      # 5. Executa o terraform plan usando o Secret do GCP Project
       - name: Terraform Plan
         id: plan
-        run: terraform plan -input=false -var="gcp_project=${{ secrets.GCP_PROJECT_ID }}" -no-color -out=tfplan
-        continue-on-error: truee
+        run: terraform plan -input=false -no-color -out=tfplan
+        env:
+          TF_VAR_gcp_project: ${{ secrets.GCP_PROJECT_ID }}
+        continue-on-error: true
 
-      # 6. Comenta o resultado do Plan automaticamente dentro do Pull Request
       - name: Comment Plan on PR
         uses: actions/github-script@v7
         if: github.event_name == 'pull_request'
@@ -71,3 +71,32 @@ jobs:
               repo: context.repo.repo,
               body: output
             })
+
+  # JOB 2: Atualiza o arquivo no Bucket e limpa o cache do CDN no Merge/Push para a main
+  deploy-and-purge-cdn:
+    name: "Deploy Website & Invalidate CDN Cache"
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      # 1. Envia a versão atualizada do index.html para o bucket "example-website-by-yuri"
+      - name: Upload index.html to Cloud Storage
+        run: |
+          gcloud storage cp website/index.html gs://example-website-by-yuri/index.html --cache-control="no-cache, max-age=0"
+
+      # 2. Invalida o cache do Cloud CDN usando o URL Map "website-url-map"
+      - name: Invalidate Cloud CDN Cache
+        run: |
+          gcloud compute url-maps invalidate-cdn-cache website-url-map --path "/*" --async
